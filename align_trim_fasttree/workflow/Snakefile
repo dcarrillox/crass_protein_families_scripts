@@ -1,0 +1,91 @@
+import glob, os
+
+
+# specify input dir with the .faa files to align, trimm and make a phylogeny
+input_dir = "/home/danielc/projects/Bas_phages/5_nr_screening/4_merged_ncbi_crassvirales/0_faa"
+
+input_faa_files = glob.glob(f"{input_dir}/*.faa")
+clusters = [os.path.basename(faa_file).replace(".faa", "") for faa_file in input_faa_files]
+
+
+
+rule all:
+    input:
+        expand([
+                "1_msas/{cl}.mafft",
+                "1_msas/{cl}_trimmed.mafft",
+                "2_trees/{cl}_trimmed.nw"
+                ],
+                cl=clusters)
+
+
+
+rule multiple_sequence_alignment:
+    input:
+        input_dir + "/{cl}.faa"
+    output:
+        "1_msas/{cl}.mafft"
+    threads: 20
+    conda:
+        "trees_pipeline.yaml"
+    # log:
+    #     "logs/1_msas/{cl}.log"
+    shell:
+        '''
+        nseqs=$(grep -c ">" {input})
+        if [[ $nseqs -lt 20000 ]]
+        then
+            if [[ $nseqs -gt 10000 ]]
+            then
+                echo "More than 5K sequences, running MAFTT AUTO instead..."
+                mafft --auto --quiet --thread {threads} {input} > {output}
+            else
+                mafft-fftnsi --maxiterate 200 --quiet --thread {threads} {input} > {output}
+            fi
+        else
+            touch {output}
+        fi
+        '''
+        #"mafft-fftnsi --maxiterate 200 --thread {threads} {input} > {output} 2> {log}"
+
+rule trimming:
+    input:
+        rules.multiple_sequence_alignment.output
+    output:
+        "1_msas/{cl}_trimmed.mafft"
+    threads: 1
+    conda:
+        "trees_pipeline.yaml"
+    shell:
+        '''
+        size=$(stat --printf="%s" {input})
+        if [[ $size -eq 0 ]]
+        then
+            touch {output}
+        else
+            trimal -in {input} -out {output} -gt 0.9
+        fi
+        '''
+        # "trimal -in {input} -out {output} -gt 0.9"
+
+rule construct_phylogeny:
+    input:
+        rules.trimming.output
+    output:
+        "2_trees/{cl}_trimmed.nw"
+    threads: 1
+    log:
+        "logs/2_trees/{cl}_trimmed.log"
+    conda:
+        "trees_pipeline.yaml"
+    shell:
+        '''
+        size=$(stat --printf="%s" {input})
+        if [[ $size -eq 0 ]]
+        then
+            touch {output}
+        else
+            fasttree {input} > {output} 2> {log}
+        fi
+        '''
+        #"fasttree {input} > {output} 2> {log}"

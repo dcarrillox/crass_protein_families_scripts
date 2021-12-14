@@ -1,0 +1,15 @@
+name: trees_pipeline
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - _libgcc_mutex=0.1=conda_forge
+  - _openmp_mutex=4.5=1_gnu
+  - fasttree=2.1.10=h779adbc_5
+  - libgcc-ng=11.2.0=h1d223b6_11
+  - libgomp=11.2.0=h1d223b6_11
+  - libstdcxx-ng=11.2.0=he4da1e4_11
+  - mafft=7.490=h779adbc_0
+  - trimal=1.4.1=h7d875b9_5
+prefix: /home/danielc/miniconda3/envs/trees_pipeline

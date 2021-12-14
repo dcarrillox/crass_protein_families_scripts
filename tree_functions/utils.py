@@ -1,4 +1,5 @@
-
+import pandas as pd
+import numpy as np
 
 def set_vOTUs(votus_file):
     '''
@@ -22,3 +23,12 @@ def set_vOTUs(votus_file):
     votus = {line[0]:{"size":len(line[1].split(",")), "votu":line[1].split(",")} for line in lines}
 
     return genomes_reprs, reprs_votus, votus
+
+def get_taxonomy_df(taxa_file):
+    '''
+    Parses the taxonomy and returns a dataframe, index=genomes, 3 columns (family, subfamily, genus)
+    '''
+    #"/home/danielc/software/github/old_june/tree_functions/files/crassphages_taxonomy_terL_and_new.txt"
+    df = pd.read_csv(taxa_file, sep="\t", index_col=0, names=["family","subfamily","genus"])
+    df['superkingdom'] = np.where(df['family'].isin(["new", "crass_env"]), "new", "crassvirales")
+    return df

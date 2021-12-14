@@ -1,0 +1,7 @@
+input_dir: "/home/danielc/projects/Bas_phages/crass_protein_families_scripts/trees_pipeline/test_data"
+summaries_dir: "/home/danielc/projects/Bas_phages/5_nr_screening/2_hits_summary"
+
+crassvirales_taxa_file: "/home/danielc/projects/Bas_phages/crass_protein_families_scripts/tree_functions/crassphages_taxonomy_terL_and_new.txt"
+
+entrez_email: "dcarrillo.bioinf@gmail.com"
+entrez_api_key: "b6db7fece605d37fcabd4b93749d2e46aa09"
