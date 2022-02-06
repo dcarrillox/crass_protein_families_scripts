@@ -10,7 +10,7 @@ import os
 
 not_align = []
 
-folders = ["trees1", "trees2", "trees3", "trees4", "trees5"] * 5000
+folders = ["trees1", "trees2", "trees3", "trees4", "trees5", "trees6", "trees7"] * 5000
 
 os.system("grep -c '>' *faa > n-seqs.txt")
 lines = [line.strip().split(".faa:") for line in open("n-seqs.txt").readlines()]

@@ -4,4 +4,5 @@ trees_pipeline/.snakemake*
 trees_pipeline/test_data
 trees_pipeline/logs
 trees_pipeline/resources
+trees_pipeline/results
 .ipynb_checkpoints

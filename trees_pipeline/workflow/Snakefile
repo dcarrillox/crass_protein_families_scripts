@@ -2,19 +2,18 @@
 include: "rules/common.smk"
 include: "rules/phylogenies.smk"
 include: "rules/bacterial_contigs.smk"
-include: "rules/predict_prophages.smk"
-
 
 
 rule all:
     input:
         expand([
-                "results/1_msas/{cl}.mafft",
-                "results/1_msas/{cl}_trimmed.mafft",
+                #"results/2_trees/{cl}/{cl}_trimmed.treefile",
                 "results/2_trees/{cl}_trimmed.nw",
-                "results/3_bacterial_sister_clades/{cl}_mrcas_sister.txt",
-                # "results/3_bacterial_sister_clades/{cl}.ipg",
-                # "results/3_bacterial_sister_clades/{cl}.fasta",
-                # "results/4_prophages/{cl}/final-viral-boundary.tsv"
+                #"results/4_prophages/{cl}/final-viral-boundary.tsv",
+                "results/3_bacterial/{cl}.ipg",
+                "results/3_bacterial/{cl}.fasta",
+                "results/3_bacterial/{cl}.todownl",
+                #"results/4_prophages/{cl}_bacterial.table",
+                #"results/4_prophages/cl_s_550_ncbi_bacterial.table"
                 ],
-                cl=CLUSTERS)
+                cl=CLUSTERS),

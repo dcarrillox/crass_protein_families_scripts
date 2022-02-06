@@ -19,6 +19,7 @@ def parse_terl_tree(tree_file, tax_df, names=False, circular=False):
     '''
     t = Tree(tree_file, format=1)
 
+    cont = 1 # counter for naming inner nodes
     for node in t.traverse():
         if node.is_leaf():
             genome = node.name.split("|")[0]
@@ -26,28 +27,36 @@ def parse_terl_tree(tree_file, tax_df, names=False, circular=False):
                               subfamily=tax_df.loc[genome, "subfamily"],
                               genus=tax_df.loc[genome, "genus"],
                               genome=genome)
+            node.img_style["size"] = 0
         else:
             # branch support
             if node.name != "":
-                node.support = round(float(node.name), 2)
+                #node.support = round(float(node.name), 2)
+                node.support = round(float(node.name.split("/")[1]), 2)
+                node.name = f"node{cont}"
+                cont += 1
+            else:
+                node.name = f"node{cont}"
+                cont += 1
 
-        node.img_style["size"] = 0
+        
 
     outgs_leaves = t.search_nodes(family="outgroup")
     outgs_lca = t.get_common_ancestor(outgs_leaves)
     t.set_outgroup(outgs_lca)
 
-    families_colors = {'Crevaviridae': 'red',
-                       'Intestiviridae': 'cyan',
-                       'Jelitoviridae': 'green',
-                       'Steigviridae': 'orange',
-                       'Suoliviridae': 'violet',
-                       'Tinaiviridae': 'brown'}
+    families_colors = {"Intestiviridae":"#EE3B3B",
+                      "Crevaviridae":"#EE9A00",
+                      "Suoliviridae":"#4169E1", 
+                      "Steigviridae":"#00CED1",
+                      "Tinaiviridae":"#CD2990",
+                      "Jelitoviridae":"#006400"
+                     }
 
     for family, color in families_colors.items():
         fam_leaves = t.search_nodes(family=family)
         fam_lca = t.get_common_ancestor(fam_leaves)
-        fam_lca.name = family
+        #fam_lca.name = family
         for node in fam_lca.traverse():
             #node.detach()
             node.img_style['hz_line_color'] = families_colors[family]
@@ -65,7 +74,7 @@ def parse_terl_tree(tree_file, tax_df, names=False, circular=False):
 
         for leaf in t.iter_leaves():
             face = TextFace(f'{tax_df.loc[leaf.genome, "subfamily"]},{tax_df.loc[leaf.genome, "genus"]}')
-            leaf.add_face(face, column=0, position = "branch-right")
+            leaf.add_face(face, column=1, position = "aligned")
 
 
     return t, ts

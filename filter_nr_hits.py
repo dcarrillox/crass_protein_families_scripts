@@ -49,7 +49,7 @@ def calculate_coverages(hit, cl_len):
     cl_starts, cl_ends = list(), list()
     p_starts, p_ends = list(), list()
     for hsp in hit.hsps:
-        if hsp.evalue < 0.001:
+        if hsp.evalue < 0.01:
             cl_starts.append(hsp.query_start)
             cl_ends.append(hsp.query_end)
             p_starts.append(hsp.env_start)
@@ -105,7 +105,7 @@ def parse_hmmsearch_file(hmmsearch_dir, cl_id):
 
     # check size
     mb = os.path.getsize(file)/(1024*1024)
-    exclude = ["cl_2650", "cl_3314", "cl_s_526", "cl_s_321"]
+    exclude = [] #["cl_2650", "cl_3314", "cl_s_526", "cl_s_321"]
     if cl_id not in exclude:
 
         # process the file
@@ -116,19 +116,29 @@ def parse_hmmsearch_file(hmmsearch_dir, cl_id):
                     print("wut?")
                 # iterate the hits, keep only those with evalue < 0.1
                 cl_len = record.seq_len
+                cont = 0
                 for hit in record.hits:
-                    if hit.evalue < 0.1:
-                        p_len, p_cov, cl_cov = calculate_coverages(hit, cl_len)
-                        if p_cov >= 0.4 and cl_cov >= 0.4:
-                            include = True
-                        else:
-                            include = False
+                    if cont < 20000:
+                        if hit.evalue < 0.01:
+                            p_len, p_cov, cl_cov = calculate_coverages(hit, cl_len)
+                            # filter only by coverage in the hit protein.
+                            # lengths in the profile might vary
+                            #if p_cov >= 0.4 and cl_cov >= 0.4:
+                            if p_cov >= 0.3:
+                                include = True
+                                cont += 1
+                            else:
+                                include = False
 
-                        to_add = [hit.id, include, hit.evalue, hit.bitscore, p_len, cl_len, p_cov, cl_cov]
-                        to_write.append(to_add)
+                            to_add = [hit.id, include, hit.evalue, hit.bitscore, p_len, cl_len, p_cov, cl_cov]
+                            to_write.append(to_add)
+                    else:
+                        print(f"{cl_id} has been cut at 20K hits.")
+                        break
 
         table = pd.DataFrame(to_write, columns=["protein_id", "included", "evalue", "bitscore", "p_len", "cl_len", "p_cov", "cl_cov"])
         table = table.set_index("protein_id")
+
         return table
 
     # file too big, skip it and return None
@@ -162,27 +172,29 @@ def get_lcas(table, faa_dir, outdir, cl_id):
     table["family"] = np.nan
     table["genus"] = np.nan
 
-    # list to store eukaryotic record.ids
-    euk_arc_records_ids = list()
 
     # count included sequences
     n_included = table.included.sum()
-    #print(n_included)
     if n_included > 0:
-        # filter table df to keep only included
-        included = table.loc[table.included, :]
 
+        cont = 0
         # parse faa file, keep only included
         # check that .faa file is present
         faa_file = f"{faa_dir}/{cl_id}.faa"
         if os.path.isfile(faa_file):
+
+            # filter table df to keep only included, up to 20K
+            included = table.loc[table.included, :]
+
+            # replace True in included by False. Depending on the number of hits,
+            # I will replace with True only Bacteria or Viruses too
+            table = table.assign(included=False)
+
             records = [record for record in SeqIO.parse(faa_file, "fasta") if record.id in included.index]
-            #print(records)
-            #
+
             for record in records:
                 #print(record.id)
                 names  = [name.split(" [")[-1][:-1] for name in record.description.split("\x01")]
-                #print(names)
 
                 taxids = list()
                 for name in names:
@@ -227,20 +239,34 @@ def get_lcas(table, faa_dir, outdir, cl_id):
                     if 1978007 in lca_lineage:
                         table.loc[record.id, "ncbi_crass"] = True
 
-                    # check it is not eukaryotic or archaeal
-                    if table.loc[record.id, "superkingdom"] in ["Eukaryota", "Archaea"]:
-                        euk_arc_records_ids.append(record.id)
-                        table.loc[record.id, "included"] = False
+                    # for the CLs with more than 1.5k included hits, include this
+                    # condition to keep up to 1.5K Bacteria hits
+                    if cont < 1500:
+                        # if there are more than 1.5k included hits, exclude Viruses too
+                        if n_included > 1500:
+                            # check it is not eukaryotic or archaeal
+                            if table.loc[record.id, "superkingdom"] not in ["Eukaryota", "Archaea", "Viruses"]:
+                                table.loc[record.id, "included"] = True
+                                cont += 1
+                        # otherwise, exclude only Euk and Arc
+                        else:
+                            if table.loc[record.id, "superkingdom"] not in ["Eukaryota", "Archaea"]:
+                                table.loc[record.id, "included"] = True
+                                cont += 1
+                    else:
+                        break
 
-            # filter out eukaryotic and archaeal
-            records_no_euk_arc = [record for record in records if record.id not in euk_arc_records_ids]
+            # get included protein ids...
+            included_prots = set(table[table.included == True].index)
+            # ... and their records
+            included_prots_records = [record for record in records if record.id in included_prots]
 
             # write .faa file
             out_faa = f"{outdir}/{cl_id}.faa"
-            for record in records_no_euk_arc:
+            for record in included_prots_records:
                 record.description = ""
             with open(out_faa, "w") as fout:
-                SeqIO.write(records_no_euk_arc, out_faa, "fasta")
+                SeqIO.write(included_prots_records, out_faa, "fasta")
 
         else:
             print(f"{faa_dir}/{cl_id}.faa was not found. Skipping taxa assessment")
@@ -270,7 +296,7 @@ def main():
     #ncbi.update_taxonomy_database()
 
     # get done summaries
-    done = [os.path.basename(file).split(".")[0] for file in glob.glob(f"{args.summary_dir}/cl_*.summary")]
+    done = [os.path.basename(file).split(".")[0] for file in glob.glob(f"{args.summary_dir}/OG_*.summary")]
     print(f"{len(done)} CLs already have a summary file")
 
     cl_ids = [os.path.basename(file).split(".")[0] for file in glob.glob(f"{args.hmmsearch_dir}/*.domtblout")

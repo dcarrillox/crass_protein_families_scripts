@@ -56,7 +56,7 @@ def run_hmm_hmmsearch(hmm_file):
 
     start = time.time()
     CL_id = os.path.basename(hmm_file).split(".hmm")[0]
-    os.system(f"hmmsearch --cpu 5 --noali --notextw -o {outdir}/{CL_id}.hmmsearch --domtblout {outdir}/{CL_id}.domtblout {hmm_file} ../nr")
+    os.system(f"hmmsearch -E 0.01 --domE 0.01 --incE 0.01 --cpu 5 --noali --notextw -o {outdir}/{CL_id}.hmmsearch --domtblout {outdir}/{CL_id}.domtblout {hmm_file} ../nr")
     print(CL_id)
     timeit(start)
     print()

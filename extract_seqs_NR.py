@@ -56,11 +56,11 @@ def parse_hmmsearch_results(hmmsearch_file):
 
     # I write this to try to speed up the filtering process by removing all the hits with evalue > 0.001
     records = SearchIO.parse(hmmsearch_file, "hmmer3-text")
-    all_hits = [hit for record in records for hit in record.hits if hit.evalue < 0.001]
+    all_hits = [hit for record in records for hit in record.hits if hit.evalue < 0.01]
     for hit in all_hits:
         #print(cl_id, hit.id)
         for hsp in hit.hsps:
-            if hsp.evalue < 0.001:
+            if hsp.evalue < 0.01:
                 hits.append(hit.id)
                 break
 
@@ -80,7 +80,8 @@ def main():
     done_cls = [os.path.basename(file).split(".")[0] for file in glob.glob(f"{args.outdir}/*.faa")]
     print(f"{len(done_cls)} already extracted sequences.")
 
-    exclude = ["cl_s_321"]
+    #exclude = ["cl_s_321"]
+    exclude = [] #["OG_1490"]
     hmmsearch_files = [hmmsearch_file for hmmsearch_file in hmmsearch_files
                        if os.path.basename(hmmsearch_file).split(".")[0] not in done_cls + exclude]
 

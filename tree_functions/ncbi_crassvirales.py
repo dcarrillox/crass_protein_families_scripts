@@ -5,6 +5,81 @@ from collections import Counter
 from ete3 import Tree, TreeStyle, TextFace, PhyloTree, NodeStyle, faces, AttrFace, CircleFace, RectFace
 from Bio import SeqIO
 
+
+def parse_vs2_annots(dir):
+    '''
+    '''
+
+    # list all the classification tables
+    classification_files = glob.glob(f"{dir}/round*/3_vs2/2_classified/*.prophages")
+
+    # parse them with pandas
+    all_dfs = list()
+    for file in classification_files:
+        df = pd.read_csv(file, sep="\t", header=0, low_memory=False)
+        # keep only analyzed proteins
+        df = df[(df["ipg_id"] != 0) & (df.ipg_id.notnull()) & (df["prophage"] != "0.0")]
+        
+        if not df.empty:
+            all_dfs.append(df)
+
+    proteins_df = pd.concat(all_dfs)
+    proteins_df.drop_duplicates(ignore_index=True, inplace=True)
+
+    proteins_df = proteins_df.rename(columns={"Unnamed: 0": "prot_id"})
+    proteins_df.set_index("prot_id", inplace=True)
+    proteins_df = proteins_df[~proteins_df.index.duplicated(keep='first')]
+
+    
+    # parse contigs information (full/partial)
+    classification_files = glob.glob(f"{dir}/round*/3_vs2/1_vs2_results/final-viral-boundary*.tsv")
+    types_list = list()
+    for file in classification_files:
+        df = pd.read_csv(file, sep="\t", header=0)
+        # split seqname_new column by ||
+        contigs_types = [[seq.split("||")[0], seq.split("||")[1]] for seq in df["seqname_new"].tolist()]
+        for contig_type in contigs_types:
+            if "partial" in contig_type[1]:
+                contig_type[1] = "partial"
+
+        types_list += contigs_types
+
+    types_df = pd.DataFrame(types_list, columns=["contig", "type"])
+    types_df.drop_duplicates(ignore_index=True, inplace=True)
+    types_df.set_index("contig", inplace=True)
+    
+    # add contig type to protein annotation
+    def add_contig_type(protein_line):
+
+        if protein_line["prophage"]:
+            #print(protein_line)
+            contigs = protein_line["prophage_contigs"].split(",")
+            #print(contigs)
+            types = list({types_df.loc[contig, "type"] for contig in contigs if contig in types_df.index})
+
+            if not types:
+                return "full"
+
+            else:
+                if len(types) > 1:
+                    return "prophage_partial"
+                else:
+                    return f"prophage_{types[0]}"
+
+        else:
+            if protein_line["n_short"] == protein_line["n_contigs"]:
+                return "short"
+            else:
+                return "bacteria"
+                
+
+
+
+    proteins_df["contig_type"] = proteins_df.apply(lambda x: add_contig_type(x), axis=1)
+
+
+    return proteins_df
+
 def parse_ncbi_summary_table(cl_id, summaries_dir):
     '''
     For a given CL id, parses the summary table with the NCBI hits for the CL
@@ -28,6 +103,7 @@ def read_and_annotate_tree(cl_id, trees_dir, ncbi_summary_df, crassvirales_taxa_
 
     # read tree
     tree_file = f"{trees_dir}/{cl_id}_ncbi_trimmed.nw"
+    print(tree_file)
     t = Tree(tree_file, format=1)
 
     # iterate the leaves, assi
@@ -59,6 +135,27 @@ def read_and_annotate_tree(cl_id, trees_dir, ncbi_summary_df, crassvirales_taxa_
 
     return t
 
+
+def annotate_inner_nodes_superkingdom(t):
+    '''
+    '''
+    for node in t.traverse():
+        if not node.is_leaf():
+            # get all phylums in the childs
+            superkingdoms = [child.superkingdom for child in node.iter_leaves()]
+
+            # get the percentage of each phylum
+            counter = Counter(superkingdoms)
+            total = sum(counter.values())
+            # store each phylum along with its percentage and count
+            superkingdoms_percent = {superkingdom:[round(count/total, 3), count] for superkingdom, count in counter.items()}
+
+            node.add_features(kingdom_perc=superkingdoms_percent)
+            
+    return t
+            
+            
+            
 def add_phylum_percent_inner_nodes(t):
     '''
 
@@ -109,12 +206,13 @@ def color_format_tree(t):
 
     '''
 
-    crassvirales_colors = {'Crevaviridae': 'red',
-                           'Intestiviridae': 'cyan',
-                           'Jelitoviridae': 'green',
-                           'Steigviridae': 'orange',
-                           'Suoliviridae': 'violet',
-                           'Tinaiviridae': 'brown'}
+    crassvirales_colors = {"Intestiviridae":"#EE3B3B",
+                      "Crevaviridae":"#EE9A00",
+                      "Suoliviridae":"#4169E1", 
+                      "Steigviridae":"#00CED1",
+                      "Tinaiviridae":"#CD2990",
+                      "Jelitoviridae":"#006400"
+                     }
 
     for node in t.traverse():
         # check if it is a Crassvirales genome
@@ -123,6 +221,10 @@ def color_format_tree(t):
                 node.img_style["bgcolor"] = crassvirales_colors[node.phylum]
             else:
                 node.img_style["size"] = 0
+               
+            # color Bacteria as yellow
+            if node.superkingdom == "Bacteria":
+                node.img_style["bgcolor"] = "yellow"
 
     return t
 
